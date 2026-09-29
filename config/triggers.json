@@ -1,0 +1,48 @@
+{
+  "triggers": [
+    {
+      "name": "Benzodiazepines",
+      "type": "Effect Based",
+      "active": true,
+      "substances": [
+        "alprazolam",
+        "bromazepam",
+        "chlordiazepoxide",
+        "clonazepam",
+        "cloxazolam",
+        "delorazepam",
+        "diazepam",
+        "flunitrazepam",
+        "flurazepam",
+        "loprazolam",
+        "lorazepam",
+        "lormetazepam",
+        "midazolam",
+        "nitrazepam",
+        "oxazepam",
+        "temazepam",
+        "amitriptyline/chlordiazepoxide",
+        "chlordiazepoxide/clidinium bromide"
+      ],
+      "relevant_terms": [
+        "safety signal",
+        "signal",
+        "adverse reaction",
+        "adverse event",
+        "risk",
+        "risk assessment",
+        "new safety information",
+        "safety concern",
+        "pregnancy",
+        "miscarriage",
+        "in-utero exposure",
+        "congenital",
+        "foetal",
+        "fetal",
+        "birth defect",
+        "embryo",
+        "teratogenic"
+      ]
+    }
+  ]
+}

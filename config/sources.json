@@ -1,0 +1,36 @@
+{
+  "sources": [
+    {
+      "reference_no": "EMA_PRAC_001",
+      "region": "EEA",
+      "monitoring_frequency": "Monthly",
+      "website": "EMA",
+      "safety_alert_type": "PRAC",
+      "source_type": "PRAC",
+      "name": "EMA PRAC Monitoring",
+      "url": "https://www.ema.europa.eu/en/committees/pharmacovigilance-risk-assessment-committee-prac",
+      "content_types": [
+        "Meeting Minutes",
+        "Agendas",
+        "Highlights"
+      ],
+      "instruction": "Monitor the configured PRAC content sections for the latest published documents.",
+      "active": true
+    },
+    {
+      "reference_no": "EMA_SIGNAL_001",
+      "region": "EEA",
+      "monitoring_frequency": "Monthly",
+      "website": "EMA",
+      "safety_alert_type": "PRAC recommendation on signals",
+      "source_type": "PRAC Signals",
+      "name": "EMA PRAC Signals",
+      "url": "https://www.ema.europa.eu/en/human-regulatory-overview/post-authorisation/pharmacovigilance-post-authorisation/signal-management/prac-recommendations-safety-signals",
+      "content_types": [
+        "PRAC recommendation on signals"
+      ],
+      "instruction": "Check for the latest published document, download it and summarize the topic.",
+      "active": true
+    }
+  ]
+}
