@@ -7,7 +7,7 @@ Models used by the FastAPI API layer.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -44,6 +44,7 @@ class SourceUpdate(BaseModel):
     content_types: Optional[List[str]] = None
     instruction: Optional[str] = None
     active: Optional[bool] = None
+    automatic_monitoring: Optional[bool] = None
 
 
 class SourceResponse(BaseModel):
@@ -115,6 +116,7 @@ class ProductResponse(BaseModel):
 
 class SourceTestRequest(BaseModel):
     url: str = Field(..., min_length=1)
+    content_types: Optional[List[str]] = None
 
 
 class SourceTestResponse(BaseModel):
@@ -133,6 +135,7 @@ class SourceTestResponse(BaseModel):
 
 class CrawlDiscoverRequest(BaseModel):
     source_id: int
+    content_types: Optional[List[str]] = None
 
 
 class CrawlProcessRequest(BaseModel):
@@ -142,6 +145,8 @@ class CrawlProcessRequest(BaseModel):
     filename: Optional[str] = None
     meeting_date: Optional[str] = None
     publication_date: Optional[str] = None
+    content_type: Optional[str] = None
+    reference_id: Optional[str] = None
 
 
 # ============================================================
@@ -246,6 +251,8 @@ class SummaryResponse(BaseModel):
 class ReviewCreate(BaseModel):
     finding_id: int
 
+    stage: Literal["INITIAL", "FINAL"] = "INITIAL"
+
     reviewer: str = Field(
         default="PV Reviewer",
         min_length=1,
@@ -260,6 +267,8 @@ class ReviewCreate(BaseModel):
 
 
 class ReviewUpdate(BaseModel):
+    stage: Literal["INITIAL", "FINAL"] = "INITIAL"
+
     reviewer: str = Field(
         default="PV Reviewer",
         min_length=1,
@@ -277,6 +286,8 @@ class ReviewResponse(BaseModel):
     id: int
 
     finding_id: int
+
+    stage: str = "INITIAL"
 
     reviewer: str
 
@@ -439,6 +450,11 @@ class OllamaTestResponse(BaseModel):
 
 class SummaryGenerateRequest(BaseModel):
     finding_id: int
+
+
+class DocumentAIAnalysisRequest(BaseModel):
+    provider: str
+    analysis_type: str = "summary"
 
 
 # ============================================================

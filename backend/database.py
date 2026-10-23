@@ -207,6 +207,26 @@ def init_db() -> None:
             """
         )
 
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS product_class_ai_analyses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                product_class_id INTEGER NOT NULL,
+                provider TEXT NOT NULL,
+                substance TEXT NOT NULL DEFAULT '',
+                summary TEXT,
+                status TEXT NOT NULL,
+                error_message TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(product_class_id, provider, substance),
+                FOREIGN KEY(product_class_id)
+                    REFERENCES product_classes(id)
+                    ON DELETE CASCADE
+            )
+            """
+        )
+
         # ----------------------------------------------------
         # PRAC DOCUMENTS
         # ----------------------------------------------------
@@ -271,6 +291,37 @@ def init_db() -> None:
             ON documents(reference_id)
             """
         )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS document_ai_analyses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                document_id INTEGER NOT NULL,
+                provider TEXT NOT NULL,
+                analysis_type TEXT NOT NULL,
+                summary TEXT,
+                status TEXT NOT NULL,
+                error_message TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(document_id, provider, analysis_type),
+                FOREIGN KEY(document_id)
+                    REFERENCES documents(id)
+                    ON DELETE CASCADE
+            )
+            """
+        )
+
+        ai_analysis_columns = {
+            row["name"]
+            for row in conn.execute(
+                "PRAGMA table_info(document_ai_analyses)"
+            ).fetchall()
+        }
+        if "error_message" not in ai_analysis_columns:
+            conn.execute(
+                "ALTER TABLE document_ai_analyses ADD COLUMN error_message TEXT"
+            )
 
         # ----------------------------------------------------
         # EXTRACTED PDF PAGES
@@ -339,6 +390,13 @@ def init_db() -> None:
             """
         )
 
+        finding_columns = {
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(findings)").fetchall()
+        }
+        if "relevant_terms" not in finding_columns:
+            conn.execute("ALTER TABLE findings ADD COLUMN relevant_terms TEXT")
+
 
         # ----------------------------------------------------
         # AI GENERATED SUMMARIES
@@ -363,6 +421,8 @@ def init_db() -> None:
 
                 summary TEXT,
 
+                model TEXT,
+
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
                 FOREIGN KEY(finding_id)
@@ -371,6 +431,13 @@ def init_db() -> None:
             )
             """
         )
+
+        summary_columns = {
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(summaries)").fetchall()
+        }
+        if "model" not in summary_columns:
+            conn.execute("ALTER TABLE summaries ADD COLUMN model TEXT")
 
 
         # ----------------------------------------------------
@@ -399,6 +466,14 @@ def init_db() -> None:
             """
         )
 
+        review_columns = {
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(reviews)").fetchall()
+        }
+        if "stage" not in review_columns:
+            conn.execute(
+                "ALTER TABLE reviews ADD COLUMN stage TEXT NOT NULL DEFAULT 'INITIAL'"
+            )
 
         # ----------------------------------------------------
         # CRAWL HISTORY
@@ -428,6 +503,16 @@ def init_db() -> None:
             """
         )
 
+        crawl_history_columns = {
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(crawl_history)").fetchall()
+        }
+        for column_name in ("new_documents", "total_documents"):
+            if column_name not in crawl_history_columns:
+                conn.execute(
+                    f"ALTER TABLE crawl_history ADD COLUMN {column_name} INTEGER"
+                )
+
 
         # ----------------------------------------------------
         # EXTRACTION HISTORY
@@ -454,6 +539,39 @@ def init_db() -> None:
                     REFERENCES documents(id)
                     ON DELETE SET NULL
             )
+            """
+        )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS audit_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL,
+                event_type TEXT NOT NULL,
+                details TEXT NOT NULL,
+                entity_type TEXT,
+                entity_id INTEGER,
+                source_id INTEGER,
+                reference_id TEXT,
+                action TEXT,
+                ai_model TEXT,
+                result TEXT,
+                status TEXT NOT NULL DEFAULT 'COMPLETED'
+            )
+            """
+        )
+
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_audit_events_created
+            ON audit_events(created_at DESC, id DESC)
+            """
+        )
+
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_audit_events_source
+            ON audit_events(source_id, created_at DESC)
             """
         )
 

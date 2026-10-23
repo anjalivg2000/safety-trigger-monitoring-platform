@@ -1,11 +1,8 @@
-fastapi
-uvicorn[standard]
 requests
 beautifulsoup4
 lxml
-PyMuPDF
 pandas
 openpyxl
-python-dotenv
-pydantic
-reportlab
+pymupdf
+streamlit
+plotly

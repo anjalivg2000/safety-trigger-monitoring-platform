@@ -7,3 +7,24 @@ __pycache__/
 .pytest_cache/
 .vscode/
 .idea/
+
+# Local databases
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+
+# Downloaded documents and generated files
+data/pdfs/
+data/summaries/
+data/pdfs.part
+output/
+
+# Local environment and secrets
+.env
+.env.*
+
+# Generated monitoring results
+new-information.csv
+
+# Local test output
+session-new-info-check.js

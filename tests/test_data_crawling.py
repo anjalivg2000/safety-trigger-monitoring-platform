@@ -5,6 +5,7 @@ from lxml import html
 
 from backend.crawler import (
     DEFAULT_SOURCE_CONFIGS,
+    classify_content_type,
     deduplicate_documents,
     discover_configured_documents,
     extract_publication_date,
@@ -98,6 +99,81 @@ class DataCrawlingTestCase(unittest.TestCase):
                 "Highlights",
             ),
             "04 September 2026",
+        )
+
+    def test_discovery_does_not_fetch_each_highlights_article(self):
+        page_html = """
+            <article>
+                <h3>
+                    <a href="/en/news/meeting-highlights-prac-31-august-2026">
+                        Meeting highlights from PRAC
+                    </a>
+                </h3>
+            </article>
+        """
+
+        class Response:
+            text = page_html
+
+        with patch(
+            "backend.crawler.request_with_retries",
+            return_value=Response(),
+        ) as request:
+            documents = discover_configured_documents(
+                "https://www.ema.europa.eu/en/committees/prac",
+                ["Highlights"],
+            )
+
+        request.assert_called_once()
+        self.assertEqual(len(documents), 1)
+        self.assertIsNone(documents[0]["publication_date"])
+
+    def test_discovery_filters_configured_types_and_keeps_unknown_pdf_group(self):
+        page_html = """
+            <article>
+                <a href="/en/documents/minutes/minutes-prac-meeting-8-11-june-2026_en.pdf">
+                    PRAC meeting minutes
+                </a>
+                <a href="/en/documents/agenda/agenda-prac-meeting-8-11-june-2026_en.pdf">
+                    PRAC meeting agenda
+                </a>
+                <a href="/en/documents/prac/other-published-document.pdf">
+                    Published document
+                </a>
+            </article>
+        """
+
+        class Response:
+            text = page_html
+
+        with patch(
+            "backend.crawler.request_with_retries",
+            return_value=Response(),
+        ):
+            documents = discover_configured_documents(
+                "https://www.ema.europa.eu/en/committees/prac",
+                ["Meeting Minutes", "Other published documents"],
+            )
+
+        self.assertEqual(
+            [document["content_type"] for document in documents],
+            ["Meeting Minutes", "Other published documents"],
+        )
+
+    def test_discovery_classifies_other_pdf_and_work_plan_groups(self):
+        self.assertEqual(
+            classify_content_type(
+                "PRAC work plan",
+                "https://example.test/prac-work-plan.pdf",
+            ),
+            "Work Plan",
+        )
+        self.assertEqual(
+            classify_content_type(
+                "Published document",
+                "https://example.test/other-document.pdf",
+            ),
+            "Other published documents",
         )
 
     def test_discovery_excludes_navigation_and_uses_publication_date(self):

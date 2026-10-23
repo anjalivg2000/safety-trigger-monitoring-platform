@@ -90,6 +90,18 @@ CONTENT_TYPE_MATCHERS = {
             "meeting highlights",
         ],
     },
+    "Rules of Procedure": {
+        "keywords": [
+            "rules of procedure",
+        ],
+    },
+    "Work Plan": {
+        "keywords": [
+            "work plan",
+            "work programme",
+            "work program",
+        ],
+    },
     "PRAC recommendation on signals": {
         "keywords": [
             "prac recommendation on safety signals",
@@ -97,6 +109,9 @@ CONTENT_TYPE_MATCHERS = {
             "safety signals",
             "signal management",
         ],
+    },
+    "Other published documents": {
+        "keywords": [],
     },
 }
 
@@ -255,6 +270,7 @@ def validate_url(url: str) -> bool:
 def request_with_retries(
     url: str,
     timeout: int = REQUEST_TIMEOUT,
+    max_attempts: int = MAX_RETRIES,
 ) -> requests.Response:
 
     if not validate_url(url):
@@ -277,7 +293,7 @@ def request_with_retries(
 
     for attempt in range(
         1,
-        MAX_RETRIES + 1,
+        max_attempts + 1,
     ):
 
         try:
@@ -300,12 +316,12 @@ def request_with_retries(
             logger.warning(
                 "Request attempt %s/%s failed for %s: %s",
                 attempt,
-                MAX_RETRIES,
+                max_attempts,
                 url,
                 exc,
             )
 
-            if attempt < MAX_RETRIES:
+            if attempt < max_attempts:
 
                 time.sleep(
                     2 ** (attempt - 1)
@@ -313,7 +329,7 @@ def request_with_retries(
 
     raise RuntimeError(
         f"Request failed after "
-        f"{MAX_RETRIES} attempts: "
+        f"{max_attempts} attempts: "
         f"{last_error}"
     )
 
@@ -443,42 +459,7 @@ def extract_publication_date(
                 except ValueError:
                     continue
 
-    if content_type != "Highlights":
-        return None
-
-    article_url = urljoin(page_url, link.get("href", ""))
-    try:
-        response = request_with_retries(article_url)
-    except Exception:
-        logger.warning(
-            "Could not retrieve publication metadata for %s.",
-            article_url,
-            exc_info=True,
-        )
-        return None
-
-    article = html.fromstring(response.text)
-    published_values = article.xpath(
-        "//meta[translate(@property, "
-        "'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz') "
-        "= 'article:published_time']/@content"
-    )
-    if not published_values:
-        return None
-
-    value = str(published_values[0]).strip()
-    try:
-        published_at = datetime.fromisoformat(
-            value.replace("Z", "+00:00")
-        )
-    except ValueError:
-        logger.warning(
-            "Unrecognized publication timestamp %r for %s.",
-            value,
-            article_url,
-        )
-        return None
-    return published_at.strftime("%d %B %Y")
+    return None
 
 
 def build_document_key(document: Dict[str, Any]) -> str:
@@ -530,6 +511,8 @@ def classify_content_type(link_text: str, href_value: str) -> str | None:
         for keyword in config.get("keywords", []):
             if keyword.lower() in combined:
                 return content_type
+    if urlparse(href_value).path.lower().endswith(".pdf"):
+        return "Other published documents"
     return None
 
 
@@ -539,8 +522,8 @@ def discover_configured_documents(
 ) -> List[Dict[str, Any]]:
     """Discover configured PRAC/EMA document links using the selected content type list."""
 
-    selected_types = normalize_content_types(content_types) or ["Meeting Minutes"]
-    response = request_with_retries(page_url)
+    selected_types = normalize_content_types(content_types) or list(CONTENT_TYPE_MATCHERS)
+    response = request_with_retries(page_url, timeout=10, max_attempts=2)
     tree = html.fromstring(response.text)
     links = tree.xpath("//a[@href]")
 
@@ -578,7 +561,7 @@ def discover_configured_documents(
         ):
             continue
 
-        if matched_type not in selected_types and not any(
+        if selected_types and matched_type not in selected_types and not any(
             selected.lower() in matched_type.lower() or matched_type.lower() in selected.lower()
             for selected in selected_types
         ):
@@ -646,7 +629,7 @@ def crawl_source(
         selected_types = normalize_content_types(content_types)
         documents = discover_configured_documents(
             page_url=source_url,
-            content_types=selected_types or ["Meeting Minutes"],
+            content_types=selected_types,
         )
 
         if source_id is not None:

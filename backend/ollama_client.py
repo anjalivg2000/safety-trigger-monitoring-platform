@@ -201,7 +201,8 @@ def build_summary_prompt(
     relevant_terms: Optional[str],
     evidence: str,
     section: Optional[str] = None,
-    comparison_status: Optional[str] = None
+    comparison_status: Optional[str] = None,
+    product_class_context: Optional[str] = None,
 ) -> str:
     """
     Build a strict evidence-only prompt for Ollama.
@@ -214,13 +215,14 @@ def build_summary_prompt(
     terms = _clean_text(relevant_terms) or "Not specified"
     section_text = _clean_text(section) or "Not specified"
     comparison = _clean_text(comparison_status) or "Not specified"
+    product_context = _clean_text(product_class_context) or "No exact configured product match"
     evidence_text = _clean_text(evidence)
 
     prompt = f"""
 You are a safety-information summarization assistant.
 
-Your task is ONLY to summarize the supplied evidence from a pharmacovigilance
-document.
+Prepare a concise topic summary and evidence-based product-specific assessment
+from the supplied pharmacovigilance evidence.
 
 IMPORTANT RULES:
 
@@ -230,7 +232,8 @@ IMPORTANT RULES:
 4. Do NOT infer causality.
 5. Do NOT make a medical diagnosis.
 6. Do NOT make a regulatory decision.
-7. Do NOT recommend an action.
+7. Do NOT make a final regulatory decision. You may state whether the evidence
+   supports considering a PI/SmPC update, and explain uncertainty.
 8. Do NOT claim that a product caused an event unless the supplied evidence
    explicitly states that conclusion.
 9. Preserve uncertainty when the source is uncertain.
@@ -243,7 +246,9 @@ IMPORTANT RULES:
     information that was not previously stored. Do not independently decide
     whether something is new.
 15. Do not decide whether the finding is relevant or requires escalation.
-16. Do not make a regulatory recommendation or conclusion.
+16. Clearly distinguish the reported product from an exact match to configured
+    product/class data. Do not infer class membership.
+17. Include a concise proposed outcome for human review, not a final decision.
 
 INPUT INFORMATION:
 
@@ -268,12 +273,18 @@ Document section:
 Deterministic comparison status:
 {comparison}
 
+Configured product/class mapping (exact configured matches only):
+{product_context}
+
 BEGIN EXACT EVIDENCE
 {evidence_text}
 END EXACT EVIDENCE
 
 Return ONLY valid JSON, with no Markdown or explanatory text, using exactly
-this structure:
+this structure. "summary" must be a concise topic summary; "prac_assessment"
+must describe evidence-supported product/class impact and whether a PI/SmPC
+update may warrant consideration; "outcome" must be a concise proposed outcome
+for the initial human reviewer:
 
 {{
   "product_name": null,
@@ -297,12 +308,15 @@ safety_topic:
 Use the supplied safety topic when supported.
 
 prac_assessment:
-Briefly state what the supplied evidence says about the PRAC assessment.
-Do not invent an assessment.
+Describe the supported impact on the explicitly reported product and any exact
+configured product/class match. State whether a PI/SmPC update may warrant
+consideration based on the evidence, or explain why it cannot be assessed.
+Do not infer a class impact or a regulatory decision.
 
 outcome:
-Briefly state the outcome or conclusion explicitly present in the evidence.
-If no outcome is stated, use "Not stated".
+Give a concise proposed outcome for the human reviewer, such as whether the
+evidence merits a PI/SmPC update assessment. Preserve uncertainty and do not
+present the proposal as an approved regulatory decision.
 
 summary:
 Write a concise evidence-based safety summary.
@@ -415,7 +429,8 @@ def generate_summary(
     relevant_terms: Optional[str],
     evidence: str,
     section: Optional[str] = None,
-    comparison_status: Optional[str] = None
+    comparison_status: Optional[str] = None,
+    product_class_context: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Generate an evidence-only safety summary using local Ollama.
@@ -465,7 +480,8 @@ def generate_summary(
         relevant_terms=relevant_terms,
         evidence=evidence,
         section=section,
-        comparison_status=comparison_status
+        comparison_status=comparison_status,
+        product_class_context=product_class_context,
     )
 
     result = _call_ollama(
@@ -485,6 +501,7 @@ def generate_summary(
             "summary": None,
             "error": result["error"]
         }
+
 
     data = result["data"]
 
@@ -555,8 +572,59 @@ def generate_summary_from_finding(
         ),
         comparison_status=finding.get(
             "comparison_status"
-        )
+        ),
+        product_class_context=finding.get("product_class_context"),
     )
+
+
+def generate_document_summary(
+    title: str,
+    content: str,
+    instruction: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Generate an evidence-grounded summary for one extracted document."""
+    connection = test_ollama_connection()
+    if not connection.get("available") or not connection.get("model_available"):
+        return {
+            "status": "UNAVAILABLE",
+            "model": OLLAMA_MODEL,
+            "error": connection.get("message")
+            or f"Configured Ollama model '{OLLAMA_MODEL}' is unavailable.",
+        }
+
+    analysis_requirement = (
+        f"Follow this configured source instruction as the analysis requirement:\n{instruction}"
+        if instruction
+        else "Summarize the document's key safety information and topics."
+    )
+    prompt = f"""
+Analyze one regulatory safety document for a pharmacovigilance reviewer.
+{analysis_requirement}
+Use only the document text below. Do not infer or invent facts. Return valid
+JSON with one string property named "summary".
+
+Document title: {title}
+
+Document text:
+{content[:40000]}
+""".strip()
+    result = _call_ollama(prompt)
+    if result.get("status") != "SUCCESS":
+        return result
+
+    summary = (result.get("data") or {}).get("summary")
+    if not isinstance(summary, str) or not summary.strip():
+        return {
+            "status": "ERROR",
+            "model": result.get("model") or OLLAMA_MODEL,
+            "error": "Ollama returned no document summary.",
+        }
+
+    return {
+        "status": "SUCCESS",
+        "model": result.get("model") or OLLAMA_MODEL,
+        "summary": summary.strip(),
+    }
 
 
 if __name__ == "__main__":

@@ -14,7 +14,7 @@
         "Agendas",
         "Highlights"
       ],
-      "instruction": "Monitor the configured PRAC content sections for the latest published documents.",
+      "instruction": "Check for Meeting minutes; download the minutes and summarize the topics.",
       "active": true
     },
     {
@@ -29,7 +29,7 @@
       "content_types": [
         "PRAC recommendation on signals"
       ],
-      "instruction": "Check for the latest published document, download it and summarize the topic.",
+      "instruction": "Check for latest published document; download and summarize the topic.",
       "active": true
     }
   ]
